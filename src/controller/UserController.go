@@ -45,11 +45,13 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	fmt.Println(output)
 	sql := "INSERT INTO users set user_nickname='" + NewUser.Name + "', user_first='" + NewUser.First + "', user_last='" + NewUser.Last +
 		"', user_email='" + NewUser.Email + "'"
-	exec, error := database.Exec(sql)
-	if error != nil {
-		fmt.Println(error)
-	}
-	fmt.Println(exec)
+	go func() {
+		exec, error := database.Exec(sql)
+		if error != nil {
+			fmt.Println(error)
+		}
+		fmt.Println(exec)
+	}()
 }
 
 func GetUser(w http.ResponseWriter, r *http.Request) {
@@ -81,18 +83,22 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	fmt.Println(output)
 	sql := "UPDATE users SET user_nickname='" + NewUser.Name + "', user_first='" + NewUser.First + "', user_last='" + NewUser.Last +
 		"', user_email='" + NewUser.Email + "' WHERE user_id=" + GetUserId(*r) + ""
-	exec, error := database.Exec(sql)
-	if error != nil {
-		fmt.Println(error)
-	}
-	fmt.Println(exec)
+	go func() {
+		exec, error := database.Exec(sql)
+		if error != nil {
+			fmt.Println(error)
+		}
+		fmt.Println(exec)
+	}()
 }
 
 func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	sql := "Delete FROM users WHERE user_id=" + GetUserId(*r) + ""
-	exec, error := database.Exec(sql)
-	if error != nil {
-		fmt.Println(error)
-	}
-	fmt.Println(exec)
+	go func() {
+		exec, error := database.Exec(sql)
+		if error != nil {
+			fmt.Println(error)
+		}
+		fmt.Println(exec)
+	}()
 }
