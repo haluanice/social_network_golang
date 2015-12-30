@@ -19,7 +19,7 @@ type User struct {
 	Last  string "json:last"
 }
 
-var database, _ = sql.Open("mysql", "root:@/social_network")
+var database, _ = sql.Open("mysql", "root:z@/social_network")
 
 func NewUser(r http.Request) User {
 	NewUser := User{}
