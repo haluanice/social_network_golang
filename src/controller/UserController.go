@@ -5,7 +5,6 @@ import (
 	"database/sql"
 
 	_ "github.com/go-sql-driver/mysql"
-
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -19,7 +18,7 @@ type User struct {
 	Last  string "json:last"
 }
 
-var database, _ = sql.Open("mysql", "root:z@/social_network")
+
 
 func NewUser(r http.Request) User {
 	NewUser := User{}
@@ -41,7 +40,7 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 	urlParams := r.URL.Query()
 	id := urlParams.Get(":id")
 	ReadUser := User{}
-	err := database.QueryRow("SELECT * FROM users WHERE user_id=?", id).Scan(&ReadUser.ID, &ReadUser.Name,
+	err := databaseFire().QueryRow("SELECT * FROM users WHERE user_id=?", id).Scan(&ReadUser.ID, &ReadUser.Name,
 		&ReadUser.First, &ReadUser.Last, &ReadUser.Email)
 
 	switch {
