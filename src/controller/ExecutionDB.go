@@ -2,18 +2,21 @@
 package controller
 
 import (
-	"fmt"
 	"database/sql"
+
 	_ "github.com/go-sql-driver/mysql"
 )
+
+var database = databaseFire()
+
 func databaseFire() *sql.DB {
-	database, _ := sql.Open("mysql", "root:z@/social_network")
+	database, _ := sql.Open("mysql", "root:@/social_network")
 	return database
 }
-func ExecuteSQL(sql string) {
-	exec, error := databaseFire().Exec(sql)
-	if error != nil {
-		fmt.Println(error)
-	}
-	fmt.Println(exec)
+
+func ExecuteSQL(sql string, c chan job) {
+	exec, _ := database.Exec(sql)
+	affectedRows, _ := exec.RowsAffected()
+	newId, _ := exec.LastInsertId()
+	c <- job{affectedRows == int64(1), newId}
 }
