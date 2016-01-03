@@ -5,8 +5,6 @@ import (
 	"database/sql"
 
 	_ "github.com/go-sql-driver/mysql"
-
-	"model"
 )
 
 var database = databaseFire()
@@ -16,9 +14,17 @@ func databaseFire() *sql.DB {
 	return database
 }
 
-func ExecuteSQL(sql string, c chan model.Job) {
+func ExecSQL(sql string, c chan sql.Result) {
 	exec, _ := database.Exec(sql)
-	affectedRows, _ := exec.RowsAffected()
-	newId, _ := exec.LastInsertId()
-	c <- model.Job{affectedRows == int64(1), newId}
+	c <- exec
+}
+
+func QuerySQL(sql string, c chan *sql.Rows) {
+	query, _ := database.Query(sql)
+	c <- query
+}
+
+func QueryRowSQL(sql string, c chan *sql.Row) {
+	query := database.QueryRow(sql)
+	c <- query
 }

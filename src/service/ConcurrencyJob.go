@@ -1,42 +1,25 @@
 package service
 
-import (
-	"database/sql"
-	"encoding/json"
-	"model"
-	"strconv"
-)
+import "database/sql"
 
-var ChanelJob = make(chan model.Job)
+var ChanelSqlRows = make(chan *sql.Rows)
 var ChanelSqlRow = make(chan *sql.Row)
+var ChanelSqlResult = make(chan sql.Result)
 
-func ExectueChanelSqlRow(SQL string) *sql.Row {
-	go SelectDataDB(SQL, ChanelSqlRow)
-	getJobSqlRow := <-ChanelSqlRow
-	return getJobSqlRow
-}
-func ExecuteChanelJob(SQL string) model.Job {
-	go ExecuteSQL(SQL, ChanelJob)
-	getJob := <-ChanelJob
-	return getJob
+func ExecuteChanelSqlRow(sequel string) *sql.Row {
+	go QueryRowSQL(sequel, ChanelSqlRow)
+	getRow := <-ChanelSqlRow
+	return getRow
 }
 
-func StringtoInt(integer string) int {
-	newInteger, _ := strconv.ParseInt(integer, 10, 0)
-	return int(newInteger)
+func ExecuteChanelSqlRows(sequel string) *sql.Rows {
+	go QuerySQL(sequel, ChanelSqlRows)
+	getRows := <-ChanelSqlRows
+	return getRows
 }
 
-func OutputError(message string) string {
-	output, _ := json.Marshal(model.ErrorMessage{message})
-	return string(output)
-}
-
-func OutputSuccess(message string, user model.User) string {
-	output, _ := json.Marshal(model.DataSuccess{message, user})
-	return string(output)
-}
-
-func SelectDataDB(sequel string, c chan *sql.Row) {
-	sqlExec := database.QueryRow(sequel)
-	c <- sqlExec
+func ExecuteChanelSqlResult(sequel string) sql.Result {
+	go ExecSQL(sequel, ChanelSqlResult)
+	getResult := <-ChanelSqlResult
+	return getResult
 }

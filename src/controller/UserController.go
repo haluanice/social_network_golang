@@ -3,15 +3,32 @@ package controller
 
 import (
 	"database/sql"
+	"fmt"
+	"strconv"
+	"sync/atomic"
 
 	"encoding/json"
-	"fmt"
 	"model"
 	"net/http"
 	"service"
 
 	_ "github.com/go-sql-driver/mysql"
 )
+
+var globalExecutionUser atomic.Value
+var globalExecutionUsers atomic.Value
+
+func atomicUser(user model.User) model.User {
+	globalExecutionUser.Store(user)
+	dataUser := globalExecutionUser.Load().(model.User)
+	return dataUser
+}
+
+func atomicUsers(users model.Users) model.Users {
+	globalExecutionUsers.Store(users)
+	dataUsers := globalExecutionUsers.Load().(model.Users)
+	return dataUsers
+}
 
 func NewUser(r http.Request) model.User {
 	NewUser := model.User{}
@@ -29,65 +46,139 @@ func GetUserId(r http.Request) string {
 	return id
 }
 
+func GetUsers(w http.ResponseWriter, r *http.Request) {
+	isValid := service.GetTokenHeader(r)
+	service.SetHeaderParameter(w)
+	switch isValid {
+	case false:
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, service.OutputError("token invalid"))
+	case true:
+		sequel := "select * from users"
+		rows := service.ExecuteChanelSqlRows(sequel)
+		users := atomicUsers(model.Users{})
+		chanUser := make(chan model.User)
+		chanUsers := make(chan model.Users)
+		go func() {
+			for rows.Next() {
+				go func() {
+					user := atomicUser(model.User{})
+					rows.Scan(&user.ID, &user.Name, &user.First, &user.Last, &user.Email)
+					chanUser <- user
+				}()
+				resChanUser := <-chanUser
+				users.Datas = append(users.Datas, resChanUser)
+			}
+			chanUsers <- users
+		}()
+		resChanUsers := <-chanUsers
+
+		output, _ := json.Marshal(resChanUsers)
+		fmt.Fprintln(w, string(output))
+	}
+}
+
 func GetUser(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Pragma", "no-cache")
-	urlParams := r.URL.Query()
-	id := urlParams.Get(":id")
-	ReadUser := model.User{}
-	sequel := fmt.Sprintf("SELECT * FROM users WHERE user_id=%s", id)
-	err := service.ExectueChanelSqlRow(sequel).Scan(&ReadUser.ID, &ReadUser.Name,
-		&ReadUser.First, &ReadUser.Last, &ReadUser.Email)
-	switch {
-	case err == sql.ErrNoRows:
-		fmt.Fprintf(w, service.OutputError("user not found"))
-	case err != nil:
-		fmt.Fprintf(w, service.OutputError("something went wrong"))
-	default:
-		fmt.Fprintf(w, service.OutputSuccess("success", ReadUser))
+	isValid := service.GetTokenHeader(r)
+	service.SetHeaderParameter(w)
+	switch isValid {
+	case false:
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, service.OutputError("token invalid"))
+	case true:
+		urlParams := r.URL.Query()
+		id := urlParams.Get(":id")
+		sequel := fmt.Sprintf("select * from users where user_id = %s", id)
+		user := atomicUser(model.User{})
+		row := service.ExecuteChanelSqlRow(sequel).Scan(&user.ID, &user.Name, &user.First, &user.Last, &user.Email)
+		switch {
+		case row == sql.ErrNoRows:
+			fmt.Fprintf(w, service.OutputError("user not found"))
+		case row != nil:
+			fmt.Fprintf(w, service.OutputError("something went wrong"))
+		default:
+			fmt.Fprintf(w, service.OutputSuccess("success", user))
+		}
 	}
 }
 
 func CreateUser(w http.ResponseWriter, r *http.Request) {
-	NewUser := NewUser(*r)
-	SQL := "INSERT INTO users set user_nickname='" + NewUser.Name + "', user_first='" + NewUser.First + "', user_last='" + NewUser.Last +
-		"', user_email='" + NewUser.Email + "'"
-	createJob := service.ExecuteChanelJob(SQL)
-	switch createJob.AffectedRow {
+	isValid := service.GetTokenHeader(r)
+	service.SetHeaderParameter(w)
+	switch isValid {
 	case false:
-		fmt.Fprintf(w, service.OutputError("data not created"))
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, service.OutputError("token invalid"))
 	case true:
-		{
-			NewUser.ID = int(createJob.LastInsertId)
-			fmt.Fprintf(w, service.OutputSuccess("created", NewUser))
+		NewUser := atomicUser(NewUser(*r))
+		SQL := "INSERT INTO users set user_nickname='" + NewUser.Name + "', user_first='" + NewUser.First +
+			"', user_last='" + NewUser.Last + "', user_email='" + NewUser.Email + "'"
+		create := service.ExecuteChanelSqlResult(SQL)
+		switch create {
+		case nil:
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, service.OutputError("data not created"))
+		default:
+			affectedRows, _ := create.RowsAffected()
+			switch affectedRows < int64(1) {
+			case true:
+				fmt.Fprintf(w, service.OutputError("data not created"))
+			case false:
+				newId, _ := create.LastInsertId()
+				NewUser.ID = int(newId)
+				output, _ := json.Marshal(NewUser)
+				fmt.Fprintln(w, string(output))
+			}
 		}
+
 	}
 }
 
 func UpdateUser(w http.ResponseWriter, r *http.Request) {
-	NewUser := NewUser(*r)
-	UserId := GetUserId(*r)
-	SQL := "UPDATE users SET user_nickname='" + NewUser.Name + "', user_first='" + NewUser.First + "', user_last='" + NewUser.Last +
-		"', user_email='" + NewUser.Email + "' WHERE user_id=" + UserId + ""
-	switch service.ExecuteChanelJob(SQL).AffectedRow {
+	isValid := service.GetTokenHeader(r)
+	service.SetHeaderParameter(w)
+	switch isValid {
 	case false:
-		fmt.Fprintf(w, service.OutputError("data not updated"))
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, service.OutputError("token invalid"))
 	case true:
-		{
-			NewUser.ID = service.StringtoInt(UserId)
-			fmt.Fprintf(w, service.OutputSuccess("updated", NewUser))
+		NewUser := atomicUser(NewUser(*r))
+		UserId := GetUserId(*r)
+		SQL := "UPDATE users SET user_nickname='" + NewUser.Name + "', user_first='" + NewUser.First +
+			"', user_last='" + NewUser.Last + "', user_email='" + NewUser.Email + "' WHERE user_id=" + UserId + ""
+		update := service.ExecuteChanelSqlResult(SQL)
+		affectedRows, _ := update.RowsAffected()
+		switch affectedRows < int64(1) {
+		case true:
+			fmt.Fprintf(w, service.OutputError("data not updated"))
+		case false:
+			userId, _ := strconv.Atoi(UserId)
+			NewUser.ID = userId
+			output, _ := json.Marshal(NewUser)
+			fmt.Fprintln(w, string(output))
 		}
 	}
+
 }
 
 func DeleteUser(w http.ResponseWriter, r *http.Request) {
-	UserId := GetUserId(*r)
-	SQL := "Delete FROM users WHERE user_id=" + UserId + ""
-
-	switch service.ExecuteChanelJob(SQL).AffectedRow {
+	isValid := service.GetTokenHeader(r)
+	service.SetHeaderParameter(w)
+	switch isValid {
 	case false:
-		fmt.Fprintf(w, service.OutputError("data not deleted"))
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, service.OutputError("token invalid"))
 	case true:
-		output, _ := json.Marshal(model.DataDestroy{"deleted", model.UserID{service.StringtoInt(UserId)}})
-		fmt.Fprintf(w, string(output))
+		UserId := GetUserId(*r)
+		SQL := "Delete FROM users WHERE user_id=" + UserId + ""
+		destroy := service.ExecuteChanelSqlResult(SQL)
+		affectedRows, _ := destroy.RowsAffected()
+		switch affectedRows < int64(1) {
+		case true:
+			fmt.Fprintf(w, service.OutputError("data not deleted"))
+		case false:
+			output, _ := json.Marshal(model.DataDestroy{"deleted", model.UserID{service.StringtoInt(UserId)}})
+			fmt.Fprintf(w, string(output))
+		}
 	}
 }

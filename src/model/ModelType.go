@@ -9,6 +9,10 @@ type User struct {
 	Last  string `json:"last"`
 }
 
+type Users struct {
+	Datas []User `json:"users"`
+}
+
 type Job struct {
 	AffectedRow  bool
 	LastInsertId int64
@@ -18,7 +22,7 @@ type ErrorMessage struct {
 	Message string `json:"message"`
 }
 
-type DataSuccess struct {
+type SuccessMessage struct {
 	Message string `json:"message"`
 	UserObj User   `json:"data"`
 }
