@@ -3,6 +3,7 @@ package main
 
 import (
 	"net/http"
+	"os"
 
 	"controller"
 
@@ -16,6 +17,10 @@ func Routes() {
 	mux.Post("/api/users/create", controller.CreateUser)
 	mux.Put("/api/users/:id", controller.UpdateUser)
 	mux.Del("/api/users/:id", controller.DeleteUser)
+	pwd, _ := os.Getwd()
+	mux.Static("/static", pwd)
+
+	mux.Post("/api/users/file", controller.UploadFile)
 	http.Handle("/", mux)
 	http.ListenAndServe(":8080", nil)
 }
